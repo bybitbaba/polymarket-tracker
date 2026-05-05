@@ -1,15 +1,14 @@
 import requests
 import time
 import csv
+import json
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from rich.live import Live
-import json   # ← Naya import
 
 console = Console()
 
-# ✅ Market Slug
 MARKET_SLUG = "cricipl-del-che-2026-05-05"
 API_URL = f"https://gamma-api.polymarket.com/markets/slug/{MARKET_SLUG}"
 
@@ -21,28 +20,32 @@ def get_prices():
         response = requests.get(API_URL, timeout=15)
         data = response.json()
         
-        # 🔥 Important Fix: String ko list mein convert karo
-        outcome_prices_str = data['outcomePrices']
-        prices = json.loads(outcome_prices_str)   # String ko proper list banao
+        # 🔥 Advanced Parsing (Sab formats handle karega)
+        price_field = data.get('outcomePrices')
         
-        dc_price = round(float(prices[0]) * 100, 1)   # Delhi Capitals
-        csk_price = round(float(prices[1]) * 100, 1)  # Chennai Super Kings
+        if isinstance(price_field, str):
+            prices = json.loads(price_field)
+        else:
+            prices = price_field
+        
+        dc_price = round(float(prices[0]) * 100, 1)
+        csk_price = round(float(prices[1]) * 100, 1)
         
         total = dc_price + csk_price
         volume = float(data.get('volume', 0))
         
-        return dc_price, csk_price, total, volume, data.get('question', 'DC vs CSK')
+        return dc_price, csk_price, total, volume
         
     except Exception as e:
         console.print(f"[red]Error fetching prices: {e}[/red]")
-        return None, None, None, None, None
+        return None, None, None, None
 
 
 print("🚀 DC vs CSK Polymarket Live Tracker Started...\n")
 
 with Live(console=console, refresh_per_second=1) as live:
     while True:
-        dc, csk, total, volume, question = get_prices()
+        dc, csk, total, volume = get_prices()
         
         if dc is None:
             time.sleep(30)
@@ -58,11 +61,10 @@ with Live(console=console, refresh_per_second=1) as live:
             writer = csv.writer(f)
             writer.writerow([current_time, dc, csk, total, dc_change, csk_change])
         
-        # Beautiful Live Table
-        table = Table(title="🔴 Delhi Capitals vs 🟠 Chennai Super Kings | Live Tracker", title_style="bold cyan")
+        table = Table(title="🔴 DC vs 🟠 CSK | Live Tracker", title_style="bold cyan")
         table.add_column("Time", style="dim")
-        table.add_column("DC", style="blue", justify="right")
-        table.add_column("CSK", style="yellow", justify="right")
+        table.add_column("Delhi Capitals", style="blue", justify="right")
+        table.add_column("Chennai Super Kings", style="yellow", justify="right")
         table.add_column("Sum", style="green", justify="right")
         table.add_column("DC 1m", justify="right")
         table.add_column("CSK 1m", justify="right")
